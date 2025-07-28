@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Hidden Google Translate Element -->
+    <div id="google_translate_element" style="display:none;"></div>
+
+    <div class="form-container">
+        <header class="form-header">
+             <div class="header-top-form">
+                <a href="/" class="back-link">← Back to Home</a>
+                <!-- Custom Language Selector -->
+                <div class="language-selector-wrapper">
+                    <select id="language-selector">
+                        <option value="en">English</option>
+                        <option value="hi">हिन्दी (Hindi)</option>
+                        <option value="mr">मराठी (Marathi)</option>
+                        <option value="gu">ગુજરાતી (Gujarati)</option>
+                        <option value="bn">বাংলা (Bengali)</option>
+                        <option value="ta">தமிழ் (Tamil)</option>
+                        <option value="te">తెలుగు (Telugu)</option>
+                    </select>
+                </div>
+            </div>
+            <h1>Report a Missing Person</h1>
+            <p>Please fill in the details below as accurately as possible.</p>
+        </header>
+
+        <% if (typeof error !== 'undefined' && error) { %>
+            <div class="error-message"><%= error %></div>
+        <% } %>
+
+        <form action="/find-person" method="POST" enctype="multipart/form-data" id="find-person-form">
+            
+            <fieldset class="form-section">
+                <legend>Section 1: Lost Person Details</legend>
+                
+                <div class="form-group">
+                    <label for="images">Lost Person's Images (min 3, max 7)</label>
+                    <input type="file" id="images" name="images" accept="image/png, image/jpeg" multiple required>
+                    <small>Select between 3 and 7 clear photos of the person.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="fullName">Full Name</label>
+                    <input type="text" id="fullName" name="fullName" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="age">Age (in years)</label>
+                    <input type="number" id="age" name="age" required oninput="handleAgeChange()">
+                </div>
+                
+                <div class="form-group" id="person-contact-group">
+                    <label for="personContactNumber">Lost Person's Contact Number</label>
+                    <input type="tel" id="personContactNumber" name="personContactNumber">
+                    <small id="contact-helper-text">Contact number is required for adults (18+).</small>
+                </div>
+
+                <div id="guardian-section" style="display: none;">
+                    <div class="form-group">
+                        <label for="guardianType">Guardian Type</label>
+                        <select id="guardianType" name="guardianType">
+                            <option value="Parent">Parent</option>
+                            <option value="Guardian">Guardian</option>
+                            <option value="Relative">Relative</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="guardianDetails">Guardian Name & Contact</label>
+                        <input type="text" id="guardianDetails" name="guardianDetails">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="lastSeenLocation">Last Seen Location</label>
+                    <input type="text" id="lastSeenLocation" name="lastSeenLocation" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="lastSeenTime">Last Seen Date and Time</label>
+                    <input type="datetime-local" id="lastSeenTime" name="lastSeenTime" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="identificationDetails">Identification Details</label>
+                    <textarea id="identificationDetails" name="identificationDetails" rows="4" placeholder="e.g., Clothing worn, scars, birthmarks, height, etc." required></textarea>
+                </div>
+            </fieldset>
+
+            <fieldset class="form-section">
+                <legend>Section 2: Your Details (Person Filing Report)</legend>
+                <div class="form-group">
+                    <label for="reporterName">Your Full Name</label>
+                    <input type="text" id="reporterName" name="reporterName" required>
+                </div>
+                <div class="form-group">
+                    <label for="reporterRelation">Your Relation to the Person</label>
+                    <select id="reporterRelation" name="reporterRelation" required>
+                        <option value="" disabled selected>-- Select a Relation --</option>
+                        <option value="Parent">Parent</option>
+                        <option value="Sibling">Sibling</option>
+                        <option value="Guardian">Guardian</option>
+                        <option value="Husband">Husband</option>
+                        <option value="Wife">Wife</option>
+                        <option value="Friend">Friend</option>
+                        <option value="Relative">Other Relative</option>
+                        <option value="Colleague">Colleague</option>
+                        <option value="Witness">Witness (Not related)</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="reporterContactNumber">Your Contact Number (for follow-up)</label>
+                    <input type="tel" id="reporterContactNumber" name="reporterContactNumber" required>
+                </div>
+            </fieldset>
+
+            <button type="submit" class="submit-btn">Submit Report</button>
+        </form>
+    </div>
+
+    <!-- Client-side scripts -->
+    <script type="text/javascript" src="/js/form-logic.js"></script>
+    <script type="text/javascript" src="/js/translator.js"></script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

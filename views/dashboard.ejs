@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="dashboard-body">
+    <header class="dashboard-header">
+        <h1>Rakshak Dashboard</h1>
+        <div>
+            <span>Welcome, <%= user.username %></span>
+            <a href="/auth/logout" class="logout-link">Logout</a>
+        </div>
+    </header>
+
+    <main class="dashboard-main">
+        <div class="controls-container">
+            <form id="filter-form" action="/dashboard" method="GET">
+                <input type="text" name="search" placeholder="Search by name or location..." value="<%= search %>">
+                <select name="sort" onchange="this.form.submit()">
+                    <option value="newest" <%= sort === 'newest' ? 'selected' : '' %>>Newest First</option>
+                    <option value="oldest" <%= sort === 'oldest' ? 'selected' : '' %>>Oldest First</option>
+                    <option value="age_asc" <%= sort === 'age_asc' ? 'selected' : '' %>>Age: Low to High</option>
+                    <option value="age_desc" <%= sort === 'age_desc' ? 'selected' : '' %>>Age: High to Low</option>
+                </select>
+                <button type="submit">Filter/Search</button>
+            </form>
+        </div>
+
+        <div class="dashboard-content">
+            <div class="person-list-container">
+                <% if (persons.length > 0) { %>
+                    <ul class="person-list">
+                        <% persons.forEach(person => { %>
+                            <li class="person-item" data-id="<%= person._id %>">
+                                <img src="<%= person.displayImage %>" alt="Photo of <%= person.fullName %>" class="person-item-img">
+                                <div class="person-item-info">
+                                    <p class="person-item-name"><%= person.fullName %></p>
+                                    <p class="person-item-age">Age: <%= person.age %></p>
+                                </div>
+                            </li>
+                        <% }) %>
+                    </ul>
+                <% } else { %>
+                    <p class="no-results">No records found.</p>
+                <% } %>
+            </div>
+
+            <div class="person-details-container" id="details-view">
+                <p class="details-placeholder">Select a person from the list to see details.</p>
+                <!-- Details will be loaded here via JS -->
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>
