@@ -25,7 +25,10 @@ app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({ mongoUrl: process.env.MONGO_URI })
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGO_URI,  // MongoDB connection URL (make sure it's in your .env file)
+    collectionName: 'sessions',  // Optional: Change the session collection name
+  })
 }));
 
 // Set global variable for session
