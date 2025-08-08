@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="dashboard-body">
+    <div id="google_translate_element" style="display: none;"></div>
+
+    <header class="dashboard-header">
+        <h1>Match Notifications</h1>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+             <div class="language-selector-wrapper">
+                <select id="language-selector">
+                    <option value="en">English</option>
+                    <option value="hi">हिन्दी (Hindi)</option>
+                    <option value="mr">मराठी (Marathi)</option>
+                </select>
+            </div>
+            <a href="/dashboard" class="logout-link">Back to Dashboard</a>
+        </div>
+    </header>
+
+    <main class="dashboard-main">
+        <div class="notification-list">
+            <% if (notifications.length > 0) { %>
+                <% notifications.forEach(noti => { %>
+                    <div class="notification-card" id="notification-<%= noti._id %>">
+                        <div class="notification-images">
+                            <div class="image-box">
+                                <label>Registered Photo</label>
+                                <img src="<%= noti.displayImage %>" alt="Registered Photo">
+                            </div>
+                            <div class="image-box">
+                                <label>Live Snapshot</label>
+                                <img src="data:image/jpeg;base64,<%= noti.snapshot %>" alt="Live Snapshot">
+                            </div>
+                        </div>
+                        <div class="notification-info">
+                            <h3><%= noti.personName %></h3>
+                            <p>Match detected at: <%= new Date(noti.createdAt).toLocaleString() %></p>
+                        </div>
+                        <div class="notification-actions">
+                            <button class="btn-research" data-id="<%= noti.personId._id %>">Re-Search</button>
+                            <button class="btn-accept" data-id="<%= noti.personId._id %>">Accept Match</button>
+                        </div>
+                    </div>
+                <% }) %>
+            <% } else { %>
+                <p class="no-results">No notifications yet.</p>
+            <% } %>
+        </div>
+    </main>
+
+    <script src="/js/translator.js"></script>
+    <script src="/js/notifications-page.js"></script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

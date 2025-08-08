@@ -8,25 +8,40 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body class="dashboard-body">
     <header class="dashboard-header">
         <h1>Rakshak Dashboard</h1>
         <div>
+            <div id="notification-bell" style="position: relative; display: inline-block; margin-right: 20px; cursor: pointer;">
+                <i class="fas fa-bell fa-lg"></i>
+                <span id="notification-count" style="position: absolute; top: -5px; right: -10px; background: red; color: white; border-radius: 50%; padding: 2px 6px; font-size: 10px; display: none;"></span>
+            </div>
             <span>Welcome, <%= user.username %></span>
             <a href="/auth/logout" class="logout-link">Logout</a>
         </div>
     </header>
 
     <main class="dashboard-main">
+        <div class="video-feed-container" style="text-align: center; margin-bottom: 2rem; background: #000; border-radius: 8px; padding: 1rem;">
+            <h3 style="color: white;">Live Monitoring Feed</h3>
+            <img id="live-feed" src="<%= process.env.PYTHON_SERVICE_URL %>/video_feed" alt="Live Feed" style="max-width: 100%; height: auto; border-radius: 8px;">
+        </div>
+
         <div class="controls-container">
             <form id="filter-form" action="/dashboard" method="GET">
                 <input type="text" name="search" placeholder="Search by name or location..." value="<%= search %>">
+                
+                <select name="statusFilter" onchange="this.form.submit()">
+                    <option value="Lost" <%= statusFilter === 'Lost' ? 'selected' : '' %>>Status: Lost</option>
+                    <option value="Found" <%= statusFilter === 'Found' ? 'selected' : '' %>>Status: Found</option>
+                    <option value="All" <%= statusFilter === 'All' ? 'selected' : '' %>>Status: All</option>
+                </select>
+
                 <select name="sort" onchange="this.form.submit()">
                     <option value="newest" <%= sort === 'newest' ? 'selected' : '' %>>Newest First</option>
                     <option value="oldest" <%= sort === 'oldest' ? 'selected' : '' %>>Oldest First</option>
-                    <option value="age_asc" <%= sort === 'age_asc' ? 'selected' : '' %>>Age: Low to High</option>
-                    <option value="age_desc" <%= sort === 'age_desc' ? 'selected' : '' %>>Age: High to Low</option>
                 </select>
                 <button type="submit">Filter/Search</button>
             </form>
@@ -38,6 +53,9 @@
                     <ul class="person-list">
                         <% persons.forEach(person => { %>
                             <li class="person-item" data-id="<%= person._id %>">
+                                <div class="person-item-status status-<%= person.status.toLowerCase() %>">
+                                    <%= person.status %>
+                                </div>
                                 <img src="<%= person.displayImage %>" alt="Photo of <%= person.fullName %>" class="person-item-img">
                                 <div class="person-item-info">
                                     <p class="person-item-name"><%= person.fullName %></p>
@@ -47,17 +65,19 @@
                         <% }) %>
                     </ul>
                 <% } else { %>
-                    <p class="no-results">No records found.</p>
+                    <p class="no-results">No records found for the selected filter.</p>
                 <% } %>
             </div>
-
             <div class="person-details-container" id="details-view">
                 <p class="details-placeholder">Select a person from the list to see details.</p>
-                <!-- Details will be loaded here via JS -->
             </div>
         </div>
     </main>
+    
+    <div id="alert-container" style="position: fixed; top: 80px; right: 20px; z-index: 9999; width: 350px;"></div>
 
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/dashboard-live.js"></script>
     <script src="/js/main.js"></script>
 </body>
 </html>

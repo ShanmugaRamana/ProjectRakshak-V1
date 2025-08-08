@@ -1,0 +1,10 @@
+Flask
+requests
+opencv-python
+numpy
+pymongo
+ultralytics
+insightface
+scipy
+faiss-cpu  # Use faiss-gpu if you have a compatible GPU
+onnxruntime

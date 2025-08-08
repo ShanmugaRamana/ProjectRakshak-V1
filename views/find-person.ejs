@@ -10,14 +10,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- Hidden Google Translate Element -->
     <div id="google_translate_element" style="display:none;"></div>
 
     <div class="form-container">
         <header class="form-header">
              <div class="header-top-form">
                 <a href="/" class="back-link">← Back to Home</a>
-                <!-- Custom Language Selector -->
                 <div class="language-selector-wrapper">
                     <select id="language-selector">
                         <option value="en">English</option>
@@ -46,22 +44,22 @@
                 <div class="form-group">
                     <label for="images">Lost Person's Images (min 3, max 7)</label>
                     <input type="file" id="images" name="images" accept="image/png, image/jpeg" multiple required>
-                    <small>Select between 3 and 7 clear photos of the person.</small>
+                    <small>Select between 3 and 7 clear photos of the person. Images must be re-selected after an error.</small>
                 </div>
 
                 <div class="form-group">
                     <label for="fullName">Full Name</label>
-                    <input type="text" id="fullName" name="fullName" required>
+                    <input type="text" id="fullName" name="fullName" required value="<%= typeof fullName !== 'undefined' ? fullName : '' %>">
                 </div>
 
                 <div class="form-group">
                     <label for="age">Age (in years)</label>
-                    <input type="number" id="age" name="age" required oninput="handleAgeChange()">
+                    <input type="number" id="age" name="age" required oninput="handleAgeChange()" value="<%= typeof age !== 'undefined' ? age : '' %>">
                 </div>
                 
                 <div class="form-group" id="person-contact-group">
                     <label for="personContactNumber">Lost Person's Contact Number</label>
-                    <input type="tel" id="personContactNumber" name="personContactNumber">
+                    <input type="tel" id="personContactNumber" name="personContactNumber" value="<%= typeof personContactNumber !== 'undefined' ? personContactNumber : '' %>">
                     <small id="contact-helper-text">Contact number is required for adults (18+).</small>
                 </div>
 
@@ -69,30 +67,30 @@
                     <div class="form-group">
                         <label for="guardianType">Guardian Type</label>
                         <select id="guardianType" name="guardianType">
-                            <option value="Parent">Parent</option>
-                            <option value="Guardian">Guardian</option>
-                            <option value="Relative">Relative</option>
+                            <option value="Parent" <%= typeof guardianType !== 'undefined' && guardianType === 'Parent' ? 'selected' : '' %>>Parent</option>
+                            <option value="Guardian" <%= typeof guardianType !== 'undefined' && guardianType === 'Guardian' ? 'selected' : '' %>>Guardian</option>
+                            <option value="Relative" <%= typeof guardianType !== 'undefined' && guardianType === 'Relative' ? 'selected' : '' %>>Relative</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="guardianDetails">Guardian Name & Contact</label>
-                        <input type="text" id="guardianDetails" name="guardianDetails">
+                        <input type="text" id="guardianDetails" name="guardianDetails" value="<%= typeof guardianDetails !== 'undefined' ? guardianDetails : '' %>">
                     </div>
                 </div>
                 
                 <div class="form-group">
                     <label for="lastSeenLocation">Last Seen Location</label>
-                    <input type="text" id="lastSeenLocation" name="lastSeenLocation" required>
+                    <input type="text" id="lastSeenLocation" name="lastSeenLocation" required value="<%= typeof lastSeenLocation !== 'undefined' ? lastSeenLocation : '' %>">
                 </div>
 
                 <div class="form-group">
                     <label for="lastSeenTime">Last Seen Date and Time</label>
-                    <input type="datetime-local" id="lastSeenTime" name="lastSeenTime" required>
+                    <input type="datetime-local" id="lastSeenTime" name="lastSeenTime" required value="<%= typeof lastSeenTime !== 'undefined' ? lastSeenTime : '' %>">
                 </div>
 
                 <div class="form-group">
                     <label for="identificationDetails">Identification Details</label>
-                    <textarea id="identificationDetails" name="identificationDetails" rows="4" placeholder="e.g., Clothing worn, scars, birthmarks, height, etc." required></textarea>
+                    <textarea id="identificationDetails" name="identificationDetails" rows="4" placeholder="e.g., Clothing worn, scars, birthmarks, height, etc." required><%= typeof identificationDetails !== 'undefined' ? identificationDetails : '' %></textarea>
                 </div>
             </fieldset>
 
@@ -100,27 +98,27 @@
                 <legend>Section 2: Your Details (Person Filing Report)</legend>
                 <div class="form-group">
                     <label for="reporterName">Your Full Name</label>
-                    <input type="text" id="reporterName" name="reporterName" required>
+                    <input type="text" id="reporterName" name="reporterName" required value="<%= typeof reporterName !== 'undefined' ? reporterName : '' %>">
                 </div>
                 <div class="form-group">
                     <label for="reporterRelation">Your Relation to the Person</label>
                     <select id="reporterRelation" name="reporterRelation" required>
                         <option value="" disabled selected>-- Select a Relation --</option>
-                        <option value="Parent">Parent</option>
-                        <option value="Sibling">Sibling</option>
-                        <option value="Guardian">Guardian</option>
-                        <option value="Husband">Husband</option>
-                        <option value="Wife">Wife</option>
-                        <option value="Friend">Friend</option>
-                        <option value="Relative">Other Relative</option>
-                        <option value="Colleague">Colleague</option>
-                        <option value="Witness">Witness (Not related)</option>
-                        <option value="Other">Other</option>
+                        <option value="Parent" <%= typeof reporterRelation !== 'undefined' && reporterRelation === 'Parent' ? 'selected' : '' %>>Parent</option>
+                        <option value="Sibling" <%= typeof reporterRelation !== 'undefined' && reporterRelation === 'Sibling' ? 'selected' : '' %>>Sibling</option>
+                        <option value="Guardian" <%= typeof reporterRelation !== 'undefined' && reporterRelation === 'Guardian' ? 'selected' : '' %>>Guardian</option>
+                        <option value="Husband" <%= typeof reporterRelation !== 'undefined' && reporterRelation === 'Husband' ? 'selected' : '' %>>Husband</option>
+                        <option value="Wife" <%= typeof reporterRelation !== 'undefined' && reporterRelation === 'Wife' ? 'selected' : '' %>>Wife</option>
+                        <option value="Friend" <%= typeof reporterRelation !== 'undefined' && reporterRelation === 'Friend' ? 'selected' : '' %>>Friend</option>
+                        <option value="Relative" <%= typeof reporterRelation !== 'undefined' && reporterRelation === 'Relative' ? 'selected' : '' %>>Other Relative</option>
+                        <option value="Colleague" <%= typeof reporterRelation !== 'undefined' && reporterRelation === 'Colleague' ? 'selected' : '' %>>Colleague</option>
+                        <option value="Witness" <%= typeof reporterRelation !== 'undefined' && reporterRelation === 'Witness' ? 'selected' : '' %>>Witness (Not related)</option>
+                        <option value="Other" <%= typeof reporterRelation !== 'undefined' && reporterRelation === 'Other' ? 'selected' : '' %>>Other</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="reporterContactNumber">Your Contact Number (for follow-up)</label>
-                    <input type="tel" id="reporterContactNumber" name="reporterContactNumber" required>
+                    <input type="tel" id="reporterContactNumber" name="reporterContactNumber" required value="<%= typeof reporterContactNumber !== 'undefined' ? reporterContactNumber : '' %>">
                 </div>
             </fieldset>
 
@@ -128,7 +126,6 @@
         </form>
     </div>
 
-    <!-- Client-side scripts -->
     <script type="text/javascript" src="/js/form-logic.js"></script>
     <script type="text/javascript" src="/js/translator.js"></script>
     <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
