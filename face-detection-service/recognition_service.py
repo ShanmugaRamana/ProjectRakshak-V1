@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 import threading
@@ -8,9 +9,14 @@ from pymongo import MongoClient
 from ultralytics import YOLO
 from insightface.app import FaceAnalysis
 from scipy.spatial.distance import cosine
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ---------------------- CONFIGURATION ----------------------
-MONGO_URI = "mongodb+srv://ramana:development2025@development.nelvrt9.mongodb.net/rakshak?retryWrites=true&w=majority&appName=development"
+MONGO_URI = os.getenv("MONGO_URI")
+print("Mongo URI:", MONGO_URI)  # Just to check
+
 NODE_API_URL = "http://localhost:3000/api/report_match"
 SIMILARITY_THRESHOLD = 0.5
 DETECTION_INTERVAL = 5
@@ -85,7 +91,7 @@ def watch_for_new_people():
                 print(f"[Watcher] Added {len(processed_faces)} new face(s) for {new_doc['fullName']} to live search.")
 
 def start_camera_and_recognition():
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
     frame_count = 0
     while True:
         ret, frame = cap.read()
