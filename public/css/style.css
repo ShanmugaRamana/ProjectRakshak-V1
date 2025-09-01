@@ -650,3 +650,35 @@ body {
     background-color: #6c757d;
     color: white;
 }
+/* Add these new rules for the map and monitoring layout */
+
+.monitoring-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Two equal columns */
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.video-feed-container, .map-container {
+    background: #000;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+}
+
+.video-feed-container h3, .map-container h3 {
+    color: white;
+    margin-top: 0;
+}
+
+#live-feed {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
+#map {
+    width: 100%;
+    height: 450px; /* Give the map a specific height */
+    border-radius: 4px;
+}
