@@ -1,5 +1,6 @@
 <div align="center">
-  <img src="https://github.com/ShanmugaRamana/project-rakshak/blob/main/public/images/rakshak_logo.png" alt="Project Logo" width="200">
+  <img src="https://github.com/ShanmugaRamana/project-rakshak/blob/main/public/images/rakshak_logo.png" alt="Project Logo" width="200"><br>
+  ___________________________________________________________________
   <strong><h3>BUILT WITH</h3></strong>
 <br>
 <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" />
