@@ -4,7 +4,9 @@ import numpy as np
 import threading
 import requests
 import base64
-from flask import Flask, Response, request, jsonify # Ensure request and jsonify are imported at the top
+import time
+from flask import Flask, Response, request, jsonify
+from flask_cors import CORS # <-- ADD THIS LINE
 from pymongo import MongoClient
 from ultralytics import YOLO
 from insightface.app import FaceAnalysis
@@ -15,15 +17,18 @@ load_dotenv()
 
 # ---------------------- CONFIGURATION ----------------------
 MONGO_URI = os.getenv("MONGO_URI")
-print("Mongo URI:", MONGO_URI)  # Just to check
+print("Mongo URI:", MONGO_URI)
 
 NODE_API_URL = "http://localhost:3000/api/report_match"
+CAMERA_SOURCES = [0, 1]  # 0 = default webcam, 1 = external webcam
 SIMILARITY_THRESHOLD = 0.5
 DETECTION_INTERVAL = 5
-VERIFICATION_THRESHOLD = 0.6  # Threshold for face verification in the form
-DUPLICATE_THRESHOLD = 0.7 
+VERIFICATION_THRESHOLD = 0.6
+DUPLICATE_THRESHOLD = 0.7
+
 # ---------------------- INITIALIZATION ----------------------
 app = Flask(__name__)
+CORS(app) # <-- ADD THIS LINE
 
 # --- Database ---
 try:
@@ -42,10 +47,12 @@ face_app = FaceAnalysis(name="buffalo_l", providers=['CPUExecutionProvider'])
 face_app.prepare(ctx_id=0)
 print("AI models initialized.")
 
-# --- Global In-memory Face Database ---
+# --- Global State Management ---
 db_faces = []
 pending_matches = set()
 db_lock = threading.Lock()
+latest_frames = {}  # Stores the latest processed frame for each camera
+frame_locks = {cam_id: threading.Lock() for cam_id in CAMERA_SOURCES}
 
 # ---------------------- CORE FUNCTIONS ----------------------
 
@@ -83,30 +90,42 @@ def watch_for_new_people():
         print("[Watcher] Monitoring MongoDB for new inserts...")
         for change in stream:
             new_doc = change['fullDocument']
-            print(f"[Watcher] Detected new person: {new_doc['fullName']}")
-            processed_faces = process_person_doc(new_doc)
-            if processed_faces:
-                with db_lock:
-                    db_faces.extend(processed_faces)
-                print(f"[Watcher] Added {len(processed_faces)} new face(s) for {new_doc['fullName']} to live search.")
+            if new_doc.get('status', 'Found') == 'Lost':
+                print(f"[Watcher] Detected new person: {new_doc['fullName']}")
+                processed_faces = process_person_doc(new_doc)
+                if processed_faces:
+                    with db_lock:
+                        db_faces.extend(processed_faces)
+                    print(f"[Watcher] Added {len(processed_faces)} new face(s) for {new_doc['fullName']} to live search.")
 
-def start_camera_and_recognition():
-    cap = cv2.VideoCapture(1)
+def process_camera_stream(camera_id):
+    """Continuously captures and processes frames from a single camera source in a thread."""
+    cap = cv2.VideoCapture(camera_id)
+    if not cap.isOpened():
+        print(f"!!!FATAL: Could not open camera {camera_id}. This thread will exit.!!!")
+        return
+        
+    camera_name = "Default Webcam" if camera_id == 0 else "External Webcam"
+    print(f"Successfully initialized {camera_name} (ID: {camera_id})")
+        
     frame_count = 0
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("Failed to capture frame. Retrying...")
+            print(f"{camera_name}: Lost connection. Retrying...")
             cap.release()
-            cap = cv2.VideoCapture(1)
+            time.sleep(2)
+            cap = cv2.VideoCapture(camera_id)
             continue
+        
         frame_count += 1
         with db_lock:
             current_db_faces = list(db_faces)
+        
         if frame_count % DETECTION_INTERVAL == 0 and current_db_faces:
             results = yolo_model(frame, verbose=False)[0]
             for box in results.boxes:
-                if int(box.cls[0]) == 0:
+                if int(box.cls[0]) == 0:  # 'person' class
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
                     face_crop = frame[y1:y2, x1:x2]
                     if face_crop.size == 0: continue
@@ -124,31 +143,35 @@ def start_camera_and_recognition():
                                 best_similarity = similarity
                                 best_match_name = db_face['name']
                                 best_match_id = db_face['mongo_id']
+                        
                         if best_match_id:
-                            print(f"Match found: {best_match_name} ({best_similarity:.2f})")
+                            print(f"Match found on {camera_name}: {best_match_name} ({best_similarity:.2f})")
                             pending_matches.add(best_match_id)
                             _, buffer = cv2.imencode('.jpg', face_crop)
                             snapshot_b64 = base64.b64encode(buffer).decode('utf-8')
                             payload = {
                                 "mongo_id": best_match_id,
                                 "name": best_match_name,
-                                "snapshot": snapshot_b64
+                                "snapshot": snapshot_b64,
+                                "camera_name": camera_name
                             }
                             try:
                                 requests.post(NODE_API_URL, json=payload, timeout=2)
                             except requests.RequestException as e:
                                 print(f"Error reporting match to Node.js: {e}")
                                 pending_matches.remove(best_match_id)
+                        
                         color = (0, 255, 0) if best_match_id else (0, 0, 255)
                         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
                         cv2.putText(frame, best_match_name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-        (flag, encodedImage) = cv2.imencode(".jpg", frame)
-        if not flag: continue
-        yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
+        
+        # Store the latest processed frame in the global dictionary
+        with frame_locks[camera_id]:
+            _, buffer = cv2.imencode('.jpg', frame)
+            latest_frames[camera_id] = buffer.tobytes()
 
 # ---------------------- FLASK WEB SERVER ----------------------
 
-### --- NEWLY ADDED FORM LOGIC --- ###
 @app.route('/detect', methods=['POST'])
 def detect_face_in_form():
     """Handles single image validation from the web form."""
@@ -165,7 +188,6 @@ def detect_face_in_form():
             npimg = np.frombuffer(filestr, np.uint8)
             image = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
 
-            # Use the powerful insightface model already loaded in memory
             detected_faces = face_app.get(image)
             face_count = len(detected_faces)
 
@@ -236,36 +258,88 @@ def verify_faceset():
 
     # If all checks pass
     return jsonify({"success": True, "message": "All images are valid, faces match, and no duplicates found."})
+
+@app.route('/video_feed/<int:camera_id>')
+def video_feed(camera_id):
+    """Streams the processed frames for a specific camera ID."""
+    if camera_id not in CAMERA_SOURCES:
+        return "Error: Invalid Camera ID", 404
+        
+    def generate_frames(cam_id):
+        while True:
+            time.sleep(0.05)  # Control frame rate
+            with frame_locks[cam_id]:
+                frame = latest_frames.get(cam_id)
+            if frame:
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
     
-    
+    return Response(generate_frames(camera_id), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+# Legacy endpoint for backward compatibility
 @app.route("/video_feed")
-def video_feed():
-    """This is the endpoint the dashboard's <img> tag will point to."""
-    return Response(start_camera_and_recognition(), mimetype="multipart/x-mixed-replace; boundary=frame")
+def video_feed_legacy():
+    """Legacy endpoint - redirects to default camera (ID 0)."""
+    return video_feed(0)
 
 @app.route("/update_search_status", methods=['POST'])
 def update_search_status():
-    """API for Node.js to tell us when to 'accept' or 're-search' a person."""
     data = request.json
     person_id = data.get('mongo_id')
-    action = data.get('action') # "accept" or "research"
+    action = data.get('action')
 
     if person_id and action:
         if action == "accept":
+            with db_lock:
+                initial_count = len(db_faces)
+                db_faces[:] = [face for face in db_faces if face.get('mongo_id') != person_id]
+                final_count = len(db_faces)
+            
             if person_id in pending_matches:
                 pending_matches.remove(person_id)
-            print(f"Action 'accept' for {person_id}. They will not be searched for again until restart.")
+
+            print(f"Action 'accept' for {person_id}. Removed {initial_count - final_count} embeddings from live search.")
+
         elif action == "research":
             if person_id in pending_matches:
                 pending_matches.remove(person_id)
-                print(f"Action 'research' for {person_id}. Re-enabling search.")
+            print(f"Action 'research' for {person_id}. Re-enabling search for this instance.")
+            
         return jsonify({"status": "ok"}), 200
+        
     return jsonify({"status": "error", "message": "Invalid data"}), 400
+
+@app.route("/camera_status")
+def camera_status():
+    """Returns the status of all configured cameras."""
+    status = {}
+    for cam_id in CAMERA_SOURCES:
+        camera_name = "Default Webcam" if cam_id == 0 else "External Webcam"
+        has_frame = cam_id in latest_frames
+        status[cam_id] = {
+            "name": camera_name,
+            "active": has_frame,
+            "stream_url": f"/video_feed/{cam_id}"
+        }
+    return jsonify(status)
 
 # ---------------------- MAIN EXECUTION ----------------------
 if __name__ == '__main__':
     load_initial_faces()
+    
+    # Start MongoDB watcher thread
     watcher_thread = threading.Thread(target=watch_for_new_people, daemon=True)
     watcher_thread.start()
+    
+    # Start camera processing threads
+    for cam_id in CAMERA_SOURCES:
+        camera_name = "Default Webcam" if cam_id == 0 else "External Webcam"
+        thread = threading.Thread(target=process_camera_stream, args=(cam_id,), daemon=True)
+        thread.start()
+        print(f"Started processing thread for {camera_name} (ID: {cam_id})")
+    
+    # Small delay to let cameras initialize
+    time.sleep(2)
+    
     print("Starting Flask server...")
     app.run(host='0.0.0.0', port=5001, debug=False)

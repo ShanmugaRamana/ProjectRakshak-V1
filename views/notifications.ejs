@@ -43,6 +43,7 @@
                         </div>
                         <div class="notification-info">
                             <h3><%= noti.personName %></h3>
+                            <p><strong>Detected on:</strong> <%= noti.cameraName %></p> 
                             <p>Match detected at: <%= new Date(noti.createdAt).toLocaleString() %></p>
                         </div>
                         <div class="notification-actions">

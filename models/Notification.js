@@ -14,6 +14,10 @@ const NotificationSchema = new mongoose.Schema({
         type: String, // Base64 image string from the camera
         required: true
     },
+    cameraName: {
+        type: String,
+        default: 'N/A'
+    },
     isRead: {
         type: Boolean,
         default: false

@@ -31,7 +31,7 @@ router.get('/notifications', ensureAuth, personController.getNotificationsPage);
 
 // --- Modified API Routes ---
 router.post('/api/report_match', async (req, res) => {
-    const { mongo_id, name, snapshot } = req.body;
+    const { mongo_id, name, snapshot, camera_name } = req.body; // Ensure camera_name is destructured
     if (!mongo_id || !name || !snapshot) {
         return res.status(400).json({ message: 'Missing data in match report.' });
     }
@@ -39,7 +39,8 @@ router.post('/api/report_match', async (req, res) => {
         const newNotification = await Notification.create({
             personId: mongo_id,
             personName: name,
-            snapshot: snapshot
+            snapshot: snapshot,
+            cameraName: camera_name // <-- ADD THIS LINE
         });
         console.log(`Notification for ${name} saved to database.`);
         req.io.emit('new_match_found', { 
@@ -55,18 +56,31 @@ router.post('/api/report_match', async (req, res) => {
     }
 });
 
+// In routes/persons.js
+
 router.post('/api/person/:id/action', ensureAuth, async (req, res) => {
-    const { action } = req.body;
+    const { action, notificationId } = req.body; // <-- Get notificationId from body
     const { id } = req.params;
+
     try {
         if (action === 'accept') {
             const person = await Person.findByIdAndUpdate(id, { status: 'Found' }, { new: true });
             if (!person) return res.status(404).json({ message: 'Person not found' });
+            
             await axios.post(`${process.env.PYTHON_SERVICE_URL}/update_search_status`, { mongo_id: id, action: 'accept' });
+            
+            // NEW: Delete the notification after action
+            if (notificationId) await Notification.findByIdAndDelete(notificationId);
+            
             return res.status(200).json({ message: `Status for ${person.fullName} updated to Found.` });
         } 
+        
         else if (action === 'research') {
             await axios.post(`${process.env.PYTHON_SERVICE_URL}/update_search_status`, { mongo_id: id, action: 'research' });
+            
+            // NEW: Delete the notification after action
+            if (notificationId) await Notification.findByIdAndDelete(notificationId);
+            
             return res.status(200).json({ message: 'Re-search initiated.' });
         }
         else {
