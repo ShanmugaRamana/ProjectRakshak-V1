@@ -68,10 +68,17 @@ const PersonSchema = new mongoose.Schema({
         default: 'Lost',
         enum: ['Lost', 'Found'],
     },
+    foundSnapshot: {
+        type: String, // Will store the Base64 image string
+    },
+    foundOnCamera: {
+        type: String,
+    },
     createdAt: {
         type: Date,
         default: Date.now,
     },
+    
 });
 
 module.exports = mongoose.model('Person', PersonSchema);

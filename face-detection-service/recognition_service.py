@@ -50,6 +50,7 @@ print("AI models initialized.")
 # --- Global State Management ---
 db_faces = []
 pending_matches = set()
+permanently_found_ids = set() # <-- ADD THIS LINE
 db_lock = threading.Lock()
 latest_frames = {}  # Stores the latest processed frame for each camera
 frame_locks = {cam_id: threading.Lock() for cam_id in CAMERA_SOURCES}
@@ -98,6 +99,8 @@ def watch_for_new_people():
                         db_faces.extend(processed_faces)
                     print(f"[Watcher] Added {len(processed_faces)} new face(s) for {new_doc['fullName']} to live search.")
 
+# In recognition_service.py
+
 def process_camera_stream(camera_id):
     """Continuously captures and processes frames from a single camera source in a thread."""
     cap = cv2.VideoCapture(camera_id)
@@ -105,17 +108,12 @@ def process_camera_stream(camera_id):
         print(f"!!!FATAL: Could not open camera {camera_id}. This thread will exit.!!!")
         return
         
-    camera_name = "Default Webcam" if camera_id == 0 else "External Webcam"
-    print(f"Successfully initialized {camera_name} (ID: {camera_id})")
-        
     frame_count = 0
     while True:
         ret, frame = cap.read()
         if not ret:
-            print(f"{camera_name}: Lost connection. Retrying...")
-            cap.release()
-            time.sleep(2)
-            cap = cv2.VideoCapture(camera_id)
+            print(f"Camera {camera_id}: Lost connection. Retrying...")
+            cap.release(); time.sleep(2); cap = cv2.VideoCapture(camera_id)
             continue
         
         frame_count += 1
@@ -125,52 +123,51 @@ def process_camera_stream(camera_id):
         if frame_count % DETECTION_INTERVAL == 0 and current_db_faces:
             results = yolo_model(frame, verbose=False)[0]
             for box in results.boxes:
-                if int(box.cls[0]) == 0:  # 'person' class
+                if int(box.cls[0]) == 0:
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
                     face_crop = frame[y1:y2, x1:x2]
                     if face_crop.size == 0: continue
                     faces = face_app.get(face_crop)
                     if faces:
                         live_embedding = faces[0].embedding
-                        best_match_name = "Unknown"
-                        best_match_id = None
-                        best_similarity = 0
+                        best_match_name, best_match_id, best_similarity = "Unknown", None, 0
                         for db_face in current_db_faces:
-                            if db_face['mongo_id'] in pending_matches:
-                                continue
+                            if db_face['mongo_id'] in permanently_found_ids: continue
+                            if db_face['mongo_id'] in pending_matches: continue
                             similarity = 1 - cosine(live_embedding, db_face['embedding'])
                             if similarity > SIMILARITY_THRESHOLD and similarity > best_similarity:
-                                best_similarity = similarity
-                                best_match_name = db_face['name']
-                                best_match_id = db_face['mongo_id']
+                                best_similarity, best_match_name, best_match_id = similarity, db_face['name'], db_face['mongo_id']
                         
                         if best_match_id:
-                            print(f"Match found on {camera_name}: {best_match_name} ({best_similarity:.2f})")
+                            print(f"Match found on Camera {camera_id}: {best_match_name}")
                             pending_matches.add(best_match_id)
                             _, buffer = cv2.imencode('.jpg', face_crop)
                             snapshot_b64 = base64.b64encode(buffer).decode('utf-8')
                             payload = {
-                                "mongo_id": best_match_id,
-                                "name": best_match_name,
-                                "snapshot": snapshot_b64,
-                                "camera_name": camera_name
+                                "mongo_id": best_match_id, "name": best_match_name,
+                                "snapshot": snapshot_b64, "camera_name": f"Camera C{camera_id + 1}"
                             }
+                            
+                            # --- NEW: More Robust Reporting and Logging ---
                             try:
-                                requests.post(NODE_API_URL, json=payload, timeout=2)
+                                print(f"--> Attempting to report match for {best_match_name} to {NODE_API_URL}")
+                                response = requests.post(NODE_API_URL, json=payload, timeout=3)
+                                # Raise an error if the server responded with 4xx or 5xx status
+                                response.raise_for_status() 
+                                print(f"<-- Successfully reported match. Node.js responded with status: {response.status_code}")
                             except requests.RequestException as e:
-                                print(f"Error reporting match to Node.js: {e}")
+                                print(f"!!! ERROR reporting match to Node.js: {e}")
                                 pending_matches.remove(best_match_id)
-                        
+                            
                         color = (0, 255, 0) if best_match_id else (0, 0, 255)
                         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
                         cv2.putText(frame, best_match_name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
         
-        # Store the latest processed frame in the global dictionary
+        # Store the latest processed frame
         with frame_locks[camera_id]:
             _, buffer = cv2.imencode('.jpg', frame)
             latest_frames[camera_id] = buffer.tobytes()
 
-# ---------------------- FLASK WEB SERVER ----------------------
 
 @app.route('/detect', methods=['POST'])
 def detect_face_in_form():
@@ -234,7 +231,7 @@ def verify_faceset():
         except Exception as e:
             return jsonify({"success": False, "message": f"Error processing image {idx + 1}: {str(e)}"})
 
-    # 1. Verify all faces in the set belong to the same person
+    
     reference_embedding = embeddings[0]
     for i in range(1, len(embeddings)):
         similarity = 1 - cosine(reference_embedding, embeddings[i])
@@ -244,7 +241,7 @@ def verify_faceset():
                 "message": f"The face in image {i + 1} does not appear to be the same person as in the first image."
             })
 
-    # 2. Check if this person already exists in the database
+   
     with db_lock:
         current_db_faces = list(db_faces)
     
@@ -256,7 +253,7 @@ def verify_faceset():
                 "message": f"This person appears to be a duplicate of '{db_face['name']}' who is already in the system."
             })
 
-    # If all checks pass
+    
     return jsonify({"success": True, "message": "All images are valid, faces match, and no duplicates found."})
 
 @app.route('/video_feed/<int:camera_id>')
@@ -267,7 +264,7 @@ def video_feed(camera_id):
         
     def generate_frames(cam_id):
         while True:
-            time.sleep(0.05)  # Control frame rate
+            time.sleep(0.05)  
             with frame_locks[cam_id]:
                 frame = latest_frames.get(cam_id)
             if frame:
@@ -276,7 +273,6 @@ def video_feed(camera_id):
     
     return Response(generate_frames(camera_id), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-# Legacy endpoint for backward compatibility
 @app.route("/video_feed")
 def video_feed_legacy():
     """Legacy endpoint - redirects to default camera (ID 0)."""
@@ -292,7 +288,8 @@ def update_search_status():
         if action == "accept":
             with db_lock:
                 initial_count = len(db_faces)
-                db_faces[:] = [face for face in db_faces if face.get('mongo_id') != person_id]
+                permanently_found_ids.add(person_id)
+                
                 final_count = len(db_faces)
             
             if person_id in pending_matches:
@@ -323,22 +320,21 @@ def camera_status():
         }
     return jsonify(status)
 
-# ---------------------- MAIN EXECUTION ----------------------
 if __name__ == '__main__':
     load_initial_faces()
     
-    # Start MongoDB watcher thread
+    
     watcher_thread = threading.Thread(target=watch_for_new_people, daemon=True)
     watcher_thread.start()
     
-    # Start camera processing threads
+    
     for cam_id in CAMERA_SOURCES:
         camera_name = "Default Webcam" if cam_id == 0 else "External Webcam"
         thread = threading.Thread(target=process_camera_stream, args=(cam_id,), daemon=True)
         thread.start()
         print(f"Started processing thread for {camera_name} (ID: {cam_id})")
     
-    # Small delay to let cameras initialize
+    
     time.sleep(2)
     
     print("Starting Flask server...")

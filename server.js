@@ -4,23 +4,26 @@ const path = require('path');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const connectDB = require('./config/db');
-const http = require('http'); // Add this
-const { Server } = require("socket.io"); // Add this
+const http = require('http');
+const { Server } = require("socket.io");
 
 // Load config
-// Ensure that the .env file is loaded before accessing process.env variables
 dotenv.config({ path: './.env' });
 
 // Connect to Database
 connectDB();
 
 const app = express();
-const server = http.createServer(app); // Create HTTP server from Express app
-const io = new Server(server); // Attach Socket.IO to the server
+const server = http.createServer(app);
+const io = new Server(server);
 
-// Body Parser Middleware
-app.use(express.urlencoded({ extended: false })); // Parse URL-encoded bodies
+
+// --- THIS IS THE CRITICAL SECTION ---
+// Body Parser Middleware to handle JSON and URL-encoded data.
+// These lines MUST come BEFORE your routes are defined.
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
 
 // EJS View Engine
 app.set('view engine', 'ejs');
@@ -44,7 +47,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// Make `io` accessible to all routes via the request object
+// Make `io` accessible to all routes
 app.use((req, res, next) => {
   req.io = io;
   next();
@@ -59,13 +62,16 @@ app.use(function (req, res, next) {
 // Static Folder
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Routes
+// Routes (defined AFTER the body-parser middleware)
 app.use('/', require('./routes/persons'));
 app.use('/auth', require('./routes/auth'));
+app.use('/staff', require('./routes/staff')); // <-- ADD THIS LINE
+app.use('/staff-auth', require('./routes/staffAuth')); // <-- ADD THIS LINE
+
+
 
 const PORT = process.env.PORT || 3000;
 
-// Use `server.listen` instead of `app.listen` to accommodate Socket.IO
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Visit http://localhost:${PORT}`);

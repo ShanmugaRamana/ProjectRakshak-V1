@@ -20,13 +20,12 @@ exports.getFindPersonForm = (req, res) => {
     });
 };
 
-// @desc    Process Find Person form, validate image set, save to DB, and trigger refresh
+// @desc    Process Find Person form, validate image set, and save to DB
 // @route   POST /find-person
 exports.postFindPersonForm = async (req, res) => {
     try {
         const files = req.files;
 
-        // 1. Basic image count validation
         if (!files || files.length < 3 || files.length > 7) {
              return res.status(400).render('find-person', { 
                 title: 'Report a Lost Person',
@@ -35,10 +34,8 @@ exports.postFindPersonForm = async (req, res) => {
             });
         }
 
-        // 2. Send ALL images to the new Python endpoint for verification
         const formData = new FormData();
         files.forEach(file => {
-            // Use 'images' as the field name, matching the Python script
             formData.append('images', file.buffer, file.originalname);
         });
 
@@ -47,7 +44,6 @@ exports.postFindPersonForm = async (req, res) => {
                 headers: formData.getHeaders(),
             });
 
-            // If the Python service says verification failed, show the detailed error
             if (!apiResponse.data.success) {
                 return res.status(400).render('find-person', {
                     title: 'Report a Lost Person',
@@ -63,9 +59,6 @@ exports.postFindPersonForm = async (req, res) => {
                 ...req.body
             });
         }
-        
-        // 3. If verification is successful, proceed to save data
-        console.log("All images validated successfully: Each has one face, and all faces match.");
         
         const { fullName, age, personContactNumber, lastSeenLocation, lastSeenTime,
             identificationDetails, guardianType, guardianDetails,
@@ -88,17 +81,10 @@ exports.postFindPersonForm = async (req, res) => {
         };
 
         await Person.create(personData);
-        console.log(`New person '${fullName}' saved to database.`);
+        console.log(`New person '${fullName}' saved to database. The Python watcher will add them automatically.`);
 
-        // 4. Trigger the Python service to refresh its face index
-        try {
-            await axios.post(`${process.env.PYTHON_SERVICE_URL}/refresh_index`);
-            console.log('Successfully requested Python service to refresh its face index.');
-        } catch (err) {
-            console.error('Could not trigger face index refresh on Python service:', err.message);
-        }
+        // The obsolete call to /refresh_index has been removed. This fixes the 404 error.
 
-        // 5. Redirect on success
         res.redirect('/');
 
     } catch (err) {
@@ -110,7 +96,7 @@ exports.postFindPersonForm = async (req, res) => {
     }
 };
 
-// @desc    Show Dashboard with filters for status, search, and sort
+// @desc    Show Dashboard with filters
 // @route   GET /dashboard
 exports.getDashboard = async (req, res) => {
     try {
