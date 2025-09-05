@@ -47,13 +47,13 @@ const PersonSchema = new mongoose.Schema({
         required: function() { return this.isMinor; }
     },
 
-    // --- Section 2: Reporter's Details (UPDATED) ---
-    reporterName: { // New field for reporter's name
+    // --- Section 2: Reporter's Details ---
+    reporterName: {
         type: String,
         required: true,
         trim: true,
     },
-    reporterRelation: { // New field for reporter's relation
+    reporterRelation: {
         type: String,
         required: true,
     },
@@ -68,8 +68,15 @@ const PersonSchema = new mongoose.Schema({
         default: 'Lost',
         enum: ['Lost', 'Found'],
     },
+    
+    // --- NEW FIELD FOR OPTIMIZATION ---
+    embeddings: {
+        type: [[Number]], // Stores an array of embeddings (which are arrays of numbers)
+        select: false,   // Prevents this large field from being sent in normal queries
+    },
+
     foundSnapshot: {
-        type: String, // Will store the Base64 image string
+        type: String,
     },
     foundOnCamera: {
         type: String,

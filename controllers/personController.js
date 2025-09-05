@@ -20,7 +20,9 @@ exports.getFindPersonForm = (req, res) => {
     });
 };
 
-// @desc    Process Find Person form, validate image set, and save to DB
+// @desc    Process Find Person form with full verification and embedding generation
+// @route   POST /find-person
+// @desc    Process Find Person form with full verification and embedding generation
 // @route   POST /find-person
 exports.postFindPersonForm = async (req, res) => {
     try {
@@ -39,12 +41,18 @@ exports.postFindPersonForm = async (req, res) => {
             formData.append('images', file.buffer, file.originalname);
         });
 
+        let embeddings = [];
         try {
+            // This is now the ONLY API call. It verifies and gets embeddings at once.
             const apiResponse = await axios.post(`${process.env.PYTHON_SERVICE_URL}/verify_faceset`, formData, {
                 headers: formData.getHeaders(),
             });
 
-            if (!apiResponse.data.success) {
+            if (apiResponse.data.success) {
+                // If successful, we get the embeddings directly from the response.
+                embeddings = apiResponse.data.embeddings;
+            } else {
+                // If it fails for any validation reason, show the specific error message from Python.
                 return res.status(400).render('find-person', {
                     title: 'Report a Lost Person',
                     error: apiResponse.data.message, 
@@ -59,6 +67,8 @@ exports.postFindPersonForm = async (req, res) => {
                 ...req.body
             });
         }
+        
+        // The second, redundant call to /generate_embeddings has been removed.
         
         const { fullName, age, personContactNumber, lastSeenLocation, lastSeenTime,
             identificationDetails, guardianType, guardianDetails,
@@ -76,19 +86,18 @@ exports.postFindPersonForm = async (req, res) => {
             fullName, age: parsedAge, personContactNumber: isMinor ? undefined : personContactNumber,
             lastSeenLocation, lastSeenTime, identificationDetails,
             images: req.files.map(file => ({ data: file.buffer, contentType: file.mimetype })),
+            embeddings: embeddings, // <-- Use the embeddings we just received
             isMinor, guardianType: isMinor ? guardianType : undefined, guardianDetails: isMinor ? guardianDetails : undefined,
             reporterName, reporterRelation, reporterContactNumber, status: 'Lost'
         };
 
         await Person.create(personData);
-        console.log(`New person '${fullName}' saved to database. The Python watcher will add them automatically.`);
-
-        // The obsolete call to /refresh_index has been removed. This fixes the 404 error.
+        console.log(`New person '${fullName}' saved to database with pre-calculated embeddings.`);
 
         res.redirect('/');
 
     } catch (err) {
-        console.error(err);
+        console.error("Error in postFindPersonForm:", err);
         if (err.name === 'ValidationError') {
              return res.status(400).render('find-person', { error: err.message, ...req.body });
         }
@@ -96,7 +105,7 @@ exports.postFindPersonForm = async (req, res) => {
     }
 };
 
-// @desc    Show Dashboard with filters
+// @desc    Show Dashboard (Optimized for performance)
 // @route   GET /dashboard
 exports.getDashboard = async (req, res) => {
     try {
@@ -120,7 +129,17 @@ exports.getDashboard = async (req, res) => {
         if (sortQuery === 'newest') sortOption.createdAt = -1;
         if (sortQuery === 'oldest') sortOption.createdAt = 1;
 
-        const persons = await Person.find(query).sort(sortOption).lean();
+        // --- PERFORMANCE OPTIMIZATION ---
+        // Project only the necessary fields for the list view.
+        // Most importantly, only get the FIRST image for the thumbnail.
+        const projection = {
+            fullName: 1,
+            age: 1,
+            status: 1,
+            images: { $slice: 1 } 
+        };
+
+        const persons = await Person.find(query, projection).sort(sortOption).lean();
 
         persons.forEach(person => {
             if (person.images && person.images.length > 0) {
@@ -143,10 +162,11 @@ exports.getDashboard = async (req, res) => {
     }
 };
 
-// @desc    Get details for a single person
+// @desc    Get details for a single person (fetches all data)
 // @route   GET /api/person/:id
 exports.getPersonDetails = async (req, res) => {
      try {
+        // For the detail view, we fetch all data (including all images)
         const person = await Person.findById(req.params.id).lean();
         if (!person) {
             return res.status(404).json({ message: 'Person not found' });
@@ -167,23 +187,17 @@ exports.getPersonDetails = async (req, res) => {
 exports.getNotificationsPage = async (req, res) => {
     try {
         const notifications = await Notification.find({})
-            .populate({
-                path: 'personId',
-                select: 'images'
-            })
+            .populate({ path: 'personId', select: 'images' })
             .sort({ createdAt: -1 })
             .lean();
 
         const formattedNotifications = notifications.map(noti => {
-            let displayImage = '/images/mp_police_logo.png'; // Fallback image
+            let displayImage = '/images/mp_police_logo.png';
             if (noti.personId && noti.personId.images && noti.personId.images.length > 0) {
                 const firstImage = noti.personId.images[0];
                 displayImage = `data:${firstImage.contentType};base64,${firstImage.data.toString('base64')}`;
             }
-            return {
-                ...noti,
-                displayImage
-            };
+            return { ...noti, displayImage };
         });
 
         res.render('notifications', {

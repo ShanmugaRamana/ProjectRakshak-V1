@@ -1,34 +1,45 @@
+// --- Core Dependencies ---
 const express = require('express');
 const dotenv = require('dotenv');
 const path = require('path');
+const http = require('http');
+const os = require('os'); // <-- NEW: To find the local IP address
+
+// --- Middleware & Session ---
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
-const connectDB = require('./config/db');
-const http = require('http');
 const { Server } = require("socket.io");
+const cors = require('cors');
+// --- Project Imports ---
+const connectDB = require('./config/db');
 
-// Load config
+// --- Initial Setup ---
 dotenv.config({ path: './.env' });
-
-// Connect to Database
 connectDB();
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    cors: {
+        origin: "*", // Allow all origins for simplicity in development
+        methods: ["GET", "POST"]
+    }
+});
 
+// --- Middleware Configuration ---
 
-// --- THIS IS THE CRITICAL SECTION ---
-// Body Parser Middleware to handle JSON and URL-encoded data.
-// These lines MUST come BEFORE your routes are defined.
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// 1. CORS Middleware: Allows requests from other origins (like your Python service)
+app.use(cors());
 
+// 2. Body Parser Middleware: To handle incoming request bodies
+// NEW: Increased limit to handle Base64 image data from forms and Python
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
-// EJS View Engine
+// 3. EJS View Engine Setup
 app.set('view engine', 'ejs');
 
-// Session Middleware
+// 4. Session Middleware: For dashboard user login
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -39,40 +50,53 @@ app.use(session({
   })
 }));
 
-// Socket.IO Connection Handler
-io.on('connection', (socket) => {
-  console.log('Dashboard user connected via Socket.IO');
-  socket.on('disconnect', () => {
-    console.log('Dashboard user disconnected');
-  });
-});
-
-// Make `io` accessible to all routes
+// 5. Custom Middleware to make Socket.IO available to routes
 app.use((req, res, next) => {
   req.io = io;
   next();
 });
 
-// Set global variable for session
+// 6. Custom Middleware to make session user available to templates
 app.use(function (req, res, next) {
     res.locals.user = req.session.user;
     next();
 });
 
-// Static Folder
+// 7. Static Folder Setup: For CSS, client-side JS, and images
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Routes (defined AFTER the body-parser middleware)
+
+// --- Socket.IO Connection Handler ---
+io.on('connection', (socket) => {
+  console.log('A client connected via Socket.IO');
+  socket.on('disconnect', () => {
+    console.log('A client disconnected from Socket.IO');
+  });
+});
+
+
+// --- Route Definitions ---
 app.use('/', require('./routes/persons'));
 app.use('/auth', require('./routes/auth'));
-app.use('/staff', require('./routes/staff')); // <-- ADD THIS LINE
-app.use('/staff-auth', require('./routes/staffAuth')); // <-- ADD THIS LINE
+app.use('/staff', require('./routes/staff'));
+app.use('/staff-auth', require('./routes/staffAuth'));
 
 
-
+// --- Server Startup ---
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Visit http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running successfully on port ${PORT}`);
+    
+    // NEW: Dynamically find and log the local network IP address
+    const interfaces = os.networkInterfaces();
+    Object.keys(interfaces).forEach((ifname) => {
+        interfaces[ifname].forEach((iface) => {
+            if ('IPv4' !== iface.family || iface.internal !== false) {
+                // Skip over internal (i.e. 127.0.0.1) and non-ipv4 addresses
+                return;
+            }
+            console.log(`- Server accessible on your network at: http://${iface.address}:${PORT}`);
+        });
+    });
 });
