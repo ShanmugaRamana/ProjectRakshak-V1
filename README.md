@@ -23,9 +23,13 @@
 Project Rakshak is an AI-powered platform designed to enhance safety, security, and surveillance during mega events such as Ujjain Simhastha 2028.  
 
 It addresses key issues such as:  
-- 👥 Missing persons in large gatherings  
+<h3>👤 Lost & Found Module</h3>  
+The Lost & Found module uses <strong>AI-powered facial recognition</strong> to identify and reunite missing persons in large gatherings.  
+Visitors can report a missing person via a <strong>QR-based web portal</strong>, and the system automatically scans live CCTV feeds to generate instant matches and alerts.  
 
-
+<h3>🛠️ Admin Dashboard</h3>  
+The Admin Dashboard provides a <strong>centralized control panel</strong> for authorities to monitor missing person reports, verification status, and system alerts.  
+It includes <strong>search, filters, and case management tools</strong>, enabling faster decision-making and real-time oversight of the Lost & Found process.  
 
 <h3>🚀 Getting Started</h3>
 
