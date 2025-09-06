@@ -84,8 +84,9 @@ npm start
     <pre>
 PORT=5000
 MONGO_URI=your_mongo_connection
-JWT_SECRET=your_secret_key
-IMAGEKIT_KEY=your_imagekit_config
+SESSION_SECRET=your_secret_key
+ADMIN_USERNAME=your_admin_name
+ADMIN_PASSWORD=your_admin_password
     </pre>
   </li>
 
@@ -97,13 +98,7 @@ docker-compose up --build
   </li>
 </ol>
 
-<h3>📡 API Endpoints (Sample)</h3>
 
-<ul>
-  <li><code>POST /api/lost-person</code> → Upload image + details of missing person</li>
-  <li><code>POST /api/sos</code> → Trigger emergency SOS request</li>
-  <li><code>GET /api/traffic</code> → Fetch live traffic & congestion updates</li>
-</ul>
 
 
 </div>
